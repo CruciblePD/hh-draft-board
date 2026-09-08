@@ -108,7 +108,7 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padd
 </head>
 <body>
 <div id="top">
-  <h1>Hardware Hooligans</h1>
+  <h1>Hardware Hooligans <span class="small muted" style="font-weight:400">build 09-07 19:40</span></h1>
   <span id="status">…</span>
   <span id="syncpill" class="pill">sync off</span>
   <span id="btns">
@@ -310,7 +310,7 @@ function compute() {
     if (benchPick && S.settings.ceilingBench) v = 0.5 * v + 0.5 * ceil * (1 - lam * p.risk.score * 0.5);
     const s1 = decision && decision > cur ? survival(p, cur, decision, nf1[p.pos]) : 1;
     const s2 = wait && decision ? survival(p, decision, wait, nf2[p.pos]) : 0;
-    const vScore = starterOpen(p.pos) ? Math.max(v, 0) + 0.01 : v;
+    const vScore = starterOpen(p.pos) ? Math.max(v, 0) + 0.01 + (round >= 10 ? 2 * (round - 9) : 0) : v;
     let byePen = 1;
     if (p.bye && starterOpen(p.pos)) {
       const sameBye = fill.starters.filter(s => s.p.bye === p.bye).length;
@@ -395,12 +395,24 @@ function renderHero(C) {
   }
   const f = C.fill;
   const ro = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'DST'].map(sl => sl + ' ' + ((ROSTER[sl] || 0) - f.open[sl]) + '/' + (ROSTER[sl] || 0)).join(' · ') + ' · BN ' + (ROSTER.BN - f.open.BN) + '/' + ROSTER.BN;
+  // when is each still-open starter slot scheduled? (from the strategist's round priors and targets)
+  const openPlan = [];
+  const curRound = C.decision ? roundOf(C.decision) : ROUNDS;
+  for (const pos of ['QB', 'RB', 'WR', 'TE', 'DST']) {
+    if (!(f.open[pos] > 0)) continue;
+    let bestR = null, bestW = 0;
+    for (let rr = curRound; rr <= ROUNDS; rr++) { const w = (STRAT.need_priors && STRAT.need_priors[String(rr)] || {})[pos] || 0; if (w > bestW) { bestW = w; bestR = rr; } }
+    if (bestR == null) continue;
+    const rp = (STRAT.round_plan || []).find(x => x.round === bestR);
+    const names = rp ? (rp.targets || []).map(k => byKey.get(k)).filter(q => q && q.pos === pos && !C.taken.has(q.key)).slice(0, 3).map(q => { const sv = SURV.players && SURV.players[q.key] ? SURV.players[q.key][String(rp.pick)] : null; return q.name + (sv != null ? ' ' + pct(sv) : ''); }) : [];
+    openPlan.push(pos + ' → R' + bestR + (rp ? ' (pick ' + rp.pick + ')' : '') + (names.length ? ': ' + names.join(', ') : '') + (bestR === curRound ? ' ← now' : ''));
+  }
   return '<div class="hero' + (C.isMyTurn ? ' now' : '') + '"><div class="hl">' + (C.isMyTurn ? 'Draft now — pick ' + C.cur + ', round ' + roundOf(C.cur) : 'Likely best at your pick ' + C.decision + ' (in ' + (C.decision - C.cur) + ' picks) — final call appears when you are on the clock') + '</div>'
     + '<div class="hn"><span class="name">' + esc(p.name) + '</span> <span class="pos ' + p.pos + '" style="font-weight:700">' + p.pos + '</span> <span class="sub">' + esc(p.team) + ' · bye ' + (p.bye || '?') + ' · ADP ' + r1(p.adp.used) + ' · value ' + r1(r.v) + '</span>'
     + (C.isMyTurn ? '<button class="primary big" data-act="mine" data-key="' + esc(p.key) + '">Draft ' + esc(p.name) + '</button>' : '') + '</div>'
     + '<div class="why">' + esc(reasons(r, C)) + '</div>'
     + (alts.length ? '<div class="alts">Next best: ' + alts.map(a => esc(a.p.name) + ' (' + a.p.pos + ', value ' + r1(a.v) + ')').join(' · ') + '</div>' : '')
-    + planHtml + '<div class="ro">Your roster: ' + esc(ro) + '</div></div>';
+    + planHtml + '<div class="ro">Your roster: ' + esc(ro) + '</div>' + (openPlan.length ? '<div class="ro">Open starters, when the plan fills them: ' + esc(openPlan.join(' · ')) + '</div>' : '') + '</div>';
 }
 function renderRecs(C) {
   const order = { clock: 0, bad: 1, warn: 2, info: 3 };
