@@ -224,13 +224,16 @@ function fillSlots(r) {
 function needMult(pos, fill, round) {
   let m;
   if (fill.open[pos] > 0) m = 1.0;
-  else if (FLEX_ELIG.includes(pos) && fill.open.FLEX > 0) m = pos === 'TE' ? 0.7 : 0.92;
-  else {
+  else if (FLEX_ELIG.includes(pos) && fill.open.FLEX > 0) {
+    m = pos === 'TE' ? 0.7 : 0.92;
+    // starters before flex: while another flex-eligible position still has an empty dedicated starter slot, discount flex use
+    if (FLEX_ELIG.some(q => q !== pos && fill.open[q] > 0)) m *= 0.65;
+  } else {
     const b = fill.benchAt[pos];
     if (pos === 'QB') m = b === 0 ? 0.3 : 0.05;
     else if (pos === 'TE') m = b === 0 ? 0.28 : 0.05;
     else if (pos === 'DST') m = 0.01;
-    else m = [0.78, 0.58, 0.42, 0.3][Math.min(b, 3)];
+    else m = [0.45, 0.35, 0.25, 0.15][Math.min(b, 3)];   // bench depth is worth well under half a starter
   }
   if (pos === 'DST' && fill.open.DST > 0) { if (round < DST_ROUNDS[0] - 1) m = 0.2; else if (round < DST_ROUNDS[0]) m = 0.55; }
   if (fill.open.BN <= 0 && fill.open[pos] <= 0 && !(FLEX_ELIG.includes(pos) && fill.open.FLEX > 0)) m = 0.01;
